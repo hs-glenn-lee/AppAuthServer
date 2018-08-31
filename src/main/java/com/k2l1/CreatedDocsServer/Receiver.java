@@ -1,4 +1,4 @@
-package com.k2l1.AppAuthServer;
+package com.k2l1.CreatedDocsServer;
 
 import java.util.concurrent.CountDownLatch;
 import org.springframework.stereotype.Component;

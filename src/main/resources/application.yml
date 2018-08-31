@@ -1,0 +1,10 @@
+spring:
+ rabbitmq:
+  host: 207.148.88.116
+  virtual-host: created-docs-vhost
+  port: 5672
+  username: created-docs-dev
+  password: rlaehdgus
+logging:
+  level:
+    org: DEBUG

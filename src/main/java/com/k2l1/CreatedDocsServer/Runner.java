@@ -1,4 +1,4 @@
-package com.k2l1.AppAuthServer;
+package com.k2l1.CreatedDocsServer;
 
 import java.util.concurrent.TimeUnit;
 
@@ -20,7 +20,7 @@ public class Runner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         System.out.println("Sending message...");
-        rabbitTemplate.convertAndSend(AppAuthServerApplication.topicExchangeName, "foo.bar.baz", "Hello from RabbitMQ!");
+        rabbitTemplate.convertAndSend(CreatedDocsServer.topicExchangeName, "created.docs.server.q", "Hello from RabbitMQ!");
         receiver.getLatch().await(10000, TimeUnit.MILLISECONDS);
     }
 
