@@ -4,12 +4,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.k2l1</groupId>
-	<artifactId>AppAuthServer</artifactId>
+	<artifactId>CreatedDocsServer</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
-	<name>AppAuthServer</name>
-	<description>AppAuthServer</description>
+	<name>CreatedDocsServer</name>
+	<description>CreatedDocsServer</description>
 
 	<parent>
 		<groupId>org.springframework.boot</groupId>
