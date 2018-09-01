@@ -8,3 +8,11 @@ spring:
 logging:
   level:
     org: DEBUG
+
+#destinations:
+#  queues:
+#    appAuth: #my prop
+#      exchange: created-docs.direct
+#      routingKey: app.auth
+
+    
