@@ -1,9 +1,17 @@
 package com.k2l1.CreatedDocsServer.messageBodies;
 
 public class Authentication {
+	
+	public static class Type {
+		public static final String NORMAL = "NORMAL";
+		public static final String ACTIVATE_NEW = "ACTIVATE_NEW";
+		public static final String ENFORCED = "ENFORCED";
+	}
+	
+	private String type;
 	private String username;
 	private String password;
-	private String type;
+	private String clientId;
 	
 	public String getUsername() {
 		return username;
@@ -22,5 +30,11 @@ public class Authentication {
 	}
 	public void setType(String type) {
 		this.type = type;
+	}
+	public String getClientId() {
+		return clientId;
+	}
+	public void setClientId(String clientId) {
+		this.clientId = clientId;
 	}
 }

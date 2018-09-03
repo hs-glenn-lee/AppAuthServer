@@ -13,6 +13,10 @@ spring:
     driverClassName: org.mariadb.jdbc.Driver
     tomcat:
       min-idle: 5
+  redis:
+    host: 127.0.0.1
+    #password: gksdkfkd123
+    port: 6379
 logging:
   level:
     org: DEBUG

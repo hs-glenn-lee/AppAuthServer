@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.apache.commons.lang3.time.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -13,13 +15,16 @@ import org.springframework.stereotype.Service;
 import com.k2l1.CreatedDocsServer.messageBodies.ActivatedSubscription;
 import com.k2l1.CreatedDocsServer.messageBodies.Authentication;
 import com.k2l1.CreatedDocsServer.messageBodies.AuthenticationResult;
-import com.k2l1.CreatedDocsServer.model.entities.Account;
-import com.k2l1.CreatedDocsServer.model.entities.Subscription;
-import com.k2l1.CreatedDocsServer.model.repo.AccountRepo;
-import com.k2l1.CreatedDocsServer.model.repo.SubscriptionRepo;
+import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
+import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
+import com.k2l1.CreatedDocsServer.model.jpa.repos.AccountRepo;
+import com.k2l1.CreatedDocsServer.model.jpa.repos.SubscriptionRepo;
+import com.k2l1.CreatedDocsServer.model.redis.AppConnection;
 
 @Service("authenticationService")
 public class SyncAuthenticationService implements AuthenticationService{
+	
+	Logger logger = LoggerFactory.getLogger(SyncAuthenticationService.class);
 	
 	@Autowired
 	SubscriptionRepo subscriptionRepo;
@@ -30,9 +35,12 @@ public class SyncAuthenticationService implements AuthenticationService{
 	@Autowired
 	ConnectionFactory connectionFactory;
 	
+	@Autowired
+	AppConnectionService appConnectionService;
+	
 	
 	@Override
-	public AuthenticationResult authenticate(Authentication authentication) {
+	public AuthenticationResult authenticateNormal(Authentication authentication) {
 		
 		try {
 			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
@@ -54,26 +62,46 @@ public class SyncAuthenticationService implements AuthenticationService{
 				}
 			}
 			
-			if(!activated.isEmpty()) {
-				
+			if(activated.isEmpty()) {
+				if(permitted.isEmpty()) {
+					AuthenticationResult ret = new AuthenticationResult();
+					ret.setResultCode(AuthenticationResult.ResultCode.UNAUHORIZED);
+					return ret;
+				}else {
+					AuthenticationResult ret = new AuthenticationResult();
+					ret.setResultCode(AuthenticationResult.ResultCode.NEED_TO_ACTIVATE_NEW);
+					return ret;
+				}
 			}else {
-				AuthenticationResult ret = new AuthenticationResult();
-				ret.setResultCode("AUTHORIZED");
-				ActivatedSubscription ret2 = new ActivatedSubscription();
-				ret2.setActivatedAt(activated.get(0).getActivatedAt().toString());
-				ret2.setId(activated.get(0).getId());
-				ret.setActivatedSubscription(ret2);
-				return ret;
+				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
+				AuthenticationResult authResult = new AuthenticationResult();
+				Optional<AppConnection> existed = appConnectionService.get(appConnection.getAccountId());
+				if(existed.isPresent()) {
+					if(authentication.getClientId().equals(existed.get().getClientId())) {
+						appConnectionService.set(appConnection);
+						authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
+						ActivatedSubscription activatedSubs = new ActivatedSubscription(activated.get(0));
+						authResult.setActivatedSubscription(activatedSubs);
+					}else {
+						authResult.setResultCode(AuthenticationResult.ResultCode.DUPLICATED);
+					}
+				}else {
+					appConnectionService.set(appConnection);
+					authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
+					ActivatedSubscription activatedSubs = new ActivatedSubscription(activated.get(0));
+					authResult.setActivatedSubscription(activatedSubs);
+				}
+
+				return authResult;
 			}
 			
 		} catch(Exception e) {
-			System.out.println(e);
+			e.printStackTrace();
+			AuthenticationResult ret = new AuthenticationResult();
+			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			return ret;
+			
 		}
-		
-		AuthenticationResult ret = new AuthenticationResult();
-		ret.setResultCode("UNAUHTORIZED");
-		return ret;
-		
 	}
 	
 	private Account findAccount(String username, String password) {
@@ -86,8 +114,7 @@ public class SyncAuthenticationService implements AuthenticationService{
 	}
 	
 	private List<Subscription> getImportantSubscriptions(Account account) {
-		subscriptionRepo.findImportantSubscriptionsOf(account);
-		return null;
+		return subscriptionRepo.findImportantSubscriptionsOf(account);
 	}
 	
 	
@@ -119,7 +146,94 @@ public class SyncAuthenticationService implements AuthenticationService{
 		if(!target.getState().equals(Subscription.State.PERMITTED)) {
 			throw new IllegalStateException("활성화할 수 없는 상태의 구독입니다.");
 		}
-		
-		//TODO 이미 활성화 되어있는 구독이 있는지 확인
+	}
+
+	@Override
+	public AuthenticationResult authenticateAndActivateNew(Authentication authentication) {
+		try {
+			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
+			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
+			
+			List<Subscription> importants = getImportantSubscriptions(tryingAccount);
+			List<Subscription> activated = new ArrayList<Subscription>();
+			List<Subscription> permitted = new ArrayList<Subscription>();
+
+			for(Subscription sub : importants) {
+				switch(sub.getState()) {
+				case Subscription.State.ACTIVATED:
+					if(activated.size() > 1) { }
+					activated.add(sub);
+					break;
+				case Subscription.State.PERMITTED:
+					permitted.add(sub);
+					break;
+				}
+			}
+			
+			AuthenticationResult authResult = new AuthenticationResult();
+			if(permitted.isEmpty()) {
+				authResult.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				return authResult;
+			}else {
+				Subscription newActivated = this.activate(permitted.get(0));
+				
+				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
+				appConnectionService.set(appConnection);
+				
+				authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
+				ActivatedSubscription activatedSubs = new ActivatedSubscription(newActivated);
+				authResult.setActivatedSubscription(activatedSubs);
+				return authResult;
+			}
+			
+		} catch(Exception e) {
+			e.printStackTrace();
+			AuthenticationResult ret = new AuthenticationResult();
+			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			return ret;
+			
+		}
+	}
+
+	@Override
+	public AuthenticationResult authenticateEnforced(Authentication authentication) {
+		try {
+			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
+			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
+			
+			List<Subscription> importants = getImportantSubscriptions(tryingAccount);
+
+			Subscription activated = null;
+			
+			for(Subscription sub : importants) {
+				switch(sub.getState()) {
+				case Subscription.State.ACTIVATED:
+					activated = sub;
+					break;
+				}
+			}
+			
+			AuthenticationResult authResult = new AuthenticationResult();
+			if(activated == null) {
+				authResult.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				return authResult;
+			}else {
+				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
+				
+				appConnectionService.remove(appConnection.getAccountId());
+				appConnectionService.set(appConnection);
+
+				authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
+				ActivatedSubscription activatedSubs = new ActivatedSubscription(activated);
+				authResult.setActivatedSubscription(activatedSubs);
+				return authResult;
+			}
+			
+		} catch(Exception e) {
+			e.printStackTrace();
+			AuthenticationResult ret = new AuthenticationResult();
+			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			return ret;
+		}
 	}
 }

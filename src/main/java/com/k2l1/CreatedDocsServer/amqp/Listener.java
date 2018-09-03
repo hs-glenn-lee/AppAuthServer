@@ -39,9 +39,23 @@ public class Listener {
 		// String msg 로 하면 message body가 출력된다.
 		System.out.println(authentication);
 		
-		AuthenticationResult result = authenticationService.authenticate(authentication);
+		AuthenticationResult result = new AuthenticationResult();
+		result.setResultCode(AuthenticationResult.ResultCode.ERROR);
+		result.setMessage("Invalid Authentication.type");
 		
-		/**/
+		switch (authentication.getType()) {
+			case Authentication.Type.NORMAL :
+				result = authenticationService.authenticateNormal(authentication);
+				break;
+			case Authentication.Type.ENFORCED :
+				result = authenticationService.authenticateEnforced(authentication);
+				break;
+			case Authentication.Type.ACTIVATE_NEW :
+				result = authenticationService.authenticateAndActivateNew(authentication);
+				break;
+		}
+		
+		/*reply*/
 		MessageProperties reponseProperties = new MessageProperties();
 		reponseProperties.setContentType("application/json");
 		reponseProperties.setContentEncoding(StandardCharsets.UTF_8.name());
@@ -51,6 +65,7 @@ public class Listener {
 		rabbitTemplate.setConnectionFactory(connectionFactory);
 		rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
 		rabbitTemplate.convertAndSend(message.getMessageProperties().getReplyTo(), result);
+		
 	}
 	
 

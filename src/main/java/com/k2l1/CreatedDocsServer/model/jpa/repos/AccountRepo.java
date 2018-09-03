@@ -1,4 +1,4 @@
-package com.k2l1.CreatedDocsServer.model.repo;
+package com.k2l1.CreatedDocsServer.model.jpa.repos;
 
 import java.util.List;
 
@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import com.k2l1.CreatedDocsServer.model.entities.Account;
+import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 
 public interface AccountRepo extends JpaRepository<Account, Long>{
 	

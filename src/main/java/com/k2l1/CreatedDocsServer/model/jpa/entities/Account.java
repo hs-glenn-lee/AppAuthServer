@@ -1,4 +1,4 @@
-package com.k2l1.CreatedDocsServer.model.entities;
+package com.k2l1.CreatedDocsServer.model.jpa.entities;
 
 import java.io.Serializable;
 import java.util.Date;
