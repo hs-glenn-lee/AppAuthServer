@@ -6,7 +6,7 @@ import java.util.Date;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
 
-import com.k2l1.CreatedDocsServer.messageBodies.Authentication;
+import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 
 @RedisHash("appConnection")

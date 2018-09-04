@@ -1,4 +1,4 @@
-package com.k2l1.CreatedDocsServer.messageBodies;
+package com.k2l1.CreatedDocsServer.messageTypes;
 
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
 

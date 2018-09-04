@@ -1,5 +1,6 @@
 package com.k2l1.CreatedDocsServer.model.service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -8,13 +9,18 @@ import java.util.Optional;
 import org.apache.commons.lang3.time.DateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.k2l1.CreatedDocsServer.messageBodies.ActivatedSubscription;
-import com.k2l1.CreatedDocsServer.messageBodies.Authentication;
-import com.k2l1.CreatedDocsServer.messageBodies.AuthenticationResult;
+import com.k2l1.CreatedDocsServer.messageTypes.ActivatedSubscription;
+import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
+import com.k2l1.CreatedDocsServer.messageTypes.AuthenticationResult;
+import com.k2l1.CreatedDocsServer.messageTypes.Unauthorization;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
 import com.k2l1.CreatedDocsServer.model.jpa.repos.AccountRepo;
@@ -220,8 +226,11 @@ public class SyncAuthenticationService implements AuthenticationService{
 			}else {
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
 				
-				appConnectionService.remove(appConnection.getAccountId());
+				Optional<AppConnection> removed = appConnectionService.remove(appConnection.getAccountId());
 				appConnectionService.set(appConnection);
+				if(removed.isPresent()) {
+					unauthorizeClient(removed.get().getClientId());
+				}
 
 				authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
 				ActivatedSubscription activatedSubs = new ActivatedSubscription(activated);
@@ -236,4 +245,51 @@ public class SyncAuthenticationService implements AuthenticationService{
 			return ret;
 		}
 	}
+
+	@Override
+	public void authenticate(Authentication authentication, Message message) {
+		AuthenticationResult result = null;
+		switch (authentication.getType()) {
+			case Authentication.Type.NORMAL :
+				result = authenticateNormal(authentication);
+				break;
+			case Authentication.Type.ENFORCED :
+				result = authenticateEnforced(authentication);
+				break;
+			case Authentication.Type.ACTIVATE_NEW :
+				result = authenticateAndActivateNew(authentication);
+				break;
+			default:
+				result = new AuthenticationResult();
+				result.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				result.setMessage("Authencation.type is not proper.");
+				break;
+		}
+		
+		/*reply*/
+		MessageProperties reponseProperties = new MessageProperties();
+		reponseProperties.setContentType("application/json");
+		reponseProperties.setContentEncoding(StandardCharsets.UTF_8.name());
+		reponseProperties.setCorrelationId(message.getMessageProperties().getCorrelationId());
+		
+		RabbitTemplate rabbitTemplate = new RabbitTemplate();
+		rabbitTemplate.setConnectionFactory(connectionFactory);
+		rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+		rabbitTemplate.convertAndSend(message.getMessageProperties().getReplyTo(), result);
+	}
+	
+	
+	public void unauthorizeClient (String clientId) {
+		MessageProperties reponseProperties = new MessageProperties();
+		reponseProperties.setContentType("application/json");
+		reponseProperties.setContentEncoding(StandardCharsets.UTF_8.name());
+		
+		RabbitTemplate rabbitTemplate = new RabbitTemplate();
+		rabbitTemplate.setConnectionFactory(connectionFactory);
+		rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+		
+		String routingKey = String.format("cd.client.%s.unauth", clientId);
+		rabbitTemplate.convertAndSend(routingKey, new Unauthorization());
+	}
+
 }

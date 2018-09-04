@@ -1,11 +1,14 @@
 package com.k2l1.CreatedDocsServer.model.service;
 
-import com.k2l1.CreatedDocsServer.messageBodies.Authentication;
-import com.k2l1.CreatedDocsServer.messageBodies.AuthenticationResult;
+import org.springframework.amqp.core.Message;
+
+import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
+import com.k2l1.CreatedDocsServer.messageTypes.AuthenticationResult;
 
 
 public interface AuthenticationService {
-	public AuthenticationResult authenticateNormal (Authentication authentication);
-	public AuthenticationResult authenticateAndActivateNew (Authentication authentication);
-	public AuthenticationResult authenticateEnforced (Authentication authentication);
+	public void authenticate (Authentication authentication, Message message);
+	AuthenticationResult authenticateNormal (Authentication authentication);
+	AuthenticationResult authenticateAndActivateNew (Authentication authentication);
+	AuthenticationResult authenticateEnforced (Authentication authentication);
 }
