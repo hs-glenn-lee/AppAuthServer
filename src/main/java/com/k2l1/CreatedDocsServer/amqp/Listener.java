@@ -1,9 +1,6 @@
 package com.k2l1.CreatedDocsServer.amqp;
 
-import java.nio.charset.StandardCharsets;
-
 import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.Argument;
 import org.springframework.amqp.rabbit.annotation.Exchange;
 import org.springframework.amqp.rabbit.annotation.Queue;
@@ -11,14 +8,12 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
 import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
-import com.k2l1.CreatedDocsServer.messageTypes.AuthenticationResult;
 import com.k2l1.CreatedDocsServer.model.service.AuthenticationService;
 
 @Component
@@ -35,7 +30,7 @@ public class Listener {
 			bindings = @QueueBinding(
 			value = @Queue(value = "cd-server-auth-q", durable = "true", autoDelete = "false"),
 			exchange = @Exchange(value = "created-docs.direct", ignoreDeclarationExceptions = "true"),
-			arguments = @Argument(name = "BodyType", type="String", value="Authentication.json"),
+			arguments = @Argument(name = "BodyType", /*type="String",*/ value="Authentication.json"),
 			key = "cd.server.auth"))
 	public void processAppAuth(Authentication authentication, Message message) {
 		// String msg 로 하면 message body가 출력된다.
