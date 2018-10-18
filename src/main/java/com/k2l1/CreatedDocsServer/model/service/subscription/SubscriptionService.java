@@ -7,4 +7,6 @@ import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
 
 public interface SubscriptionService {
 	public AffectiveSubscriptions getAffectiveSubscriptions(Account account);
+	public Subscription activate(Subscription subscription);
+	
 }

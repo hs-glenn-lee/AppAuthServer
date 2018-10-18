@@ -41,4 +41,8 @@ public class AppConnection implements Serializable{
 	public void setCreatedAt(Date createdAt) {
 		this.createdAt = createdAt;
 	}
+	
+	public String toString() {
+		return "accountId: " + accountId + ", clinetId: " + clientId + ", createdAt: " + createdAt;
+	}
 }

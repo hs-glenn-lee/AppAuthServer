@@ -2,11 +2,9 @@ package com.k2l1.CreatedDocsServer.model.service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.commons.lang3.time.DateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -23,20 +21,18 @@ import com.k2l1.CreatedDocsServer.messages.AuthenticationResultMessage;
 import com.k2l1.CreatedDocsServer.messages.UnauthorizationMessage;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
-import com.k2l1.CreatedDocsServer.model.jpa.repos.AccountRepo;
-import com.k2l1.CreatedDocsServer.model.jpa.repos.SubscriptionRepo;
 import com.k2l1.CreatedDocsServer.model.redis.AppConnection;
+import com.k2l1.CreatedDocsServer.model.service.subscription.AccountSubscriptionState;
+import com.k2l1.CreatedDocsServer.model.service.subscription.AffectiveSubscriptions;
+import com.k2l1.CreatedDocsServer.model.service.subscription.SubscriptionService;
 
 @Service("authenticationService")
 public class AuthenticationServiceImpl implements AuthenticationService{
 	
 	Logger logger = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
-	
+
 	@Autowired
-	SubscriptionRepo subscriptionRepo;
-	
-	@Autowired
-	AccountRepo accountRepo;
+	SubscriptionService subscriptionService;
 	
 	@Autowired
 	ConnectionFactory connectionFactory;
@@ -44,185 +40,70 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 	@Autowired
 	AppConnectionService appConnectionService;
 	
+	@Autowired
+	AccountService accountService;
 	
-	@Override
-	public AuthenticationResultMessage authenticateNormal(AuthenticationMessage authentication) {
-		
+
+	private AuthenticationResultMessage authenticateNormal(AuthenticationMessage authentication) {
 		try {
-			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
+			Account tryingAccount = accountService.findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
-			List<Subscription> activated = new ArrayList<Subscription>();
-			List<Subscription> permitted = new ArrayList<Subscription>();
+			AffectiveSubscriptions affectives = subscriptionService.getAffectiveSubscriptions(tryingAccount);
 
-			for(Subscription sub : importants) {
-				switch(sub.getState()) {
-				case Subscription.State.ACTIVATED:
-					if(activated.size() > 1) { }
-					activated.add(sub);
-					break;
-				case Subscription.State.PERMITTED:
-					permitted.add(sub);
-					break;
-				}
-			}
-			
-			if(activated.isEmpty()) {
-				if(permitted.isEmpty()) {
-					AuthenticationResultMessage ret = new AuthenticationResultMessage();
-					ret.setResultCode(AuthenticationResultMessage.ResultCode.UNAUHORIZED);
-					return ret;
-				}else {
-					AuthenticationResultMessage ret = new AuthenticationResultMessage();
-					ret.setResultCode(AuthenticationResultMessage.ResultCode.NEED_TO_ACTIVATE_NEW);
-					return ret;
-				}
+			if(affectives.getAccountSubscriptionState() == AccountSubscriptionState.UNAVAILABLE) {
+				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.UNAUHORIZED);
 			}else {
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
-				AuthenticationResultMessage authResult = new AuthenticationResultMessage();
+				
 				Optional<AppConnection> existed = appConnectionService.get(appConnection.getAccountId());
 				if(existed.isPresent()) {
+					System.out.println(authentication.getClientId()+ ", " + existed.get().getClientId());
 					if(authentication.getClientId().equals(existed.get().getClientId())) {
 						appConnectionService.set(appConnection);
-						authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
-						ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated.get(0));
-						authResult.setActivatedSubscription(activatedSubs);
+						return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 					}else {
-						authResult.setResultCode(AuthenticationResultMessage.ResultCode.DUPLICATED);
+						return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.DUPLICATED);
 					}
 				}else {
-					appConnectionService.set(appConnection);
-					authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
-					ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated.get(0));
-					authResult.setActivatedSubscription(activatedSubs);
+					return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 				}
-
-				return authResult;
 			}
-			
 		} catch(Exception e) {
 			e.printStackTrace();
-			AuthenticationResultMessage ret = new AuthenticationResultMessage();
-			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
-			return ret;
-			
-		}
-	}
-	
-	private Account findAccount(String username, String password) {
-		List<Account> finded = accountRepo.findByUsernameAndPassword(username, password);
-		if(finded.isEmpty()) {
-			return null;
-		}else {
-			return finded.get(0);
-		}
-	}
-	
-	private List<Subscription> getAffectiveSubscriptions(Account account) {
-		return subscriptionRepo.findAffectiveSubscriptionsOf(account);
-	}
-	
-	
-	public Subscription activate(Subscription subscription) {
-		Optional<Subscription> opt = subscriptionRepo.findById(subscription.getId());
-		validateActivatingSubscription(opt);
-		
-		Subscription target = opt.get();
-		target.setState(Subscription.State.ACTIVATED);
-		target.setActivatedAt(new Date());
-		target.setExpireAt(calculateExpireDate(target, target.getActivatedAt()));
-		subscriptionRepo.save(target);
-		return target;
-	}
-	
-	private Date calculateExpireDate(Subscription subscription, Date start) {
-		Long amount = subscription.getPeriodAmount();
-		/*String unit = subscription.getPeriodUnit();*/
-		Date expireAt = DateUtils.addMonths(start, amount.intValue());
-		DateUtils.addDays(expireAt, 1);
-		DateUtils.addSeconds(expireAt, -1);
-		return expireAt;
-	}
-	
-	private void validateActivatingSubscription(Optional<Subscription> opt) {
-		if(!opt.isPresent())
-			throw new IllegalStateException("해당하는 구독이 없습니다.");
-		Subscription target = opt.get();
-		if(!target.getState().equals(Subscription.State.PERMITTED)) {
-			throw new IllegalStateException("활성화할 수 없는 상태의 구독입니다.");
+			return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, e.getMessage());
 		}
 	}
 
-	@Override
-	public AuthenticationResultMessage authenticateAndActivateNew(AuthenticationMessage authentication) {
+	private AuthenticationResultMessage authenticateAndActivateNew(AuthenticationMessage authentication) {
 		try {
-			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
+			Account tryingAccount = accountService.findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
-			List<Subscription> activated = new ArrayList<Subscription>();
-			List<Subscription> permitted = new ArrayList<Subscription>();
-
-			for(Subscription sub : importants) {
-				switch(sub.getState()) {
-				case Subscription.State.ACTIVATED:
-					if(activated.size() > 1) { }
-					activated.add(sub);
-					break;
-				case Subscription.State.PERMITTED:
-					permitted.add(sub);
-					break;
-				}
-			}
-			
-			AuthenticationResultMessage authResult = new AuthenticationResultMessage();
-			if(permitted.isEmpty()) {
-				authResult.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
-				return authResult;
+			AffectiveSubscriptions affectives = subscriptionService.getAffectiveSubscriptions(tryingAccount);
+			if(affectives.getAccountSubscriptionState() == AccountSubscriptionState.UNAVAILABLE) {
+				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, "활성화 가능한 구독이 없습니다.");
 			}else {
-				Subscription newActivated = this.activate(permitted.get(0));
-				
+				Subscription newActivated = subscriptionService.activate(affectives.getPermitted());
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
 				appConnectionService.set(appConnection);
-				
-				authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
-				ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(newActivated);
-				authResult.setActivatedSubscription(activatedSubs);
-				return authResult;
+				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, newActivated);
 			}
-			
 		} catch(Exception e) {
 			e.printStackTrace();
-			AuthenticationResultMessage ret = new AuthenticationResultMessage();
-			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
-			return ret;
-			
+			return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, e.getMessage());
 		}
 	}
 
-	@Override
-	public AuthenticationResultMessage authenticateEnforcedly(AuthenticationMessage authentication) {
+	
+	private AuthenticationResultMessage authenticateEnforcedly(AuthenticationMessage authentication) {
 		try {
-			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
+			Account tryingAccount = accountService.findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
-
-			Subscription activated = null;
-			
-			for(Subscription sub : importants) {
-				switch(sub.getState()) {
-				case Subscription.State.ACTIVATED:
-					activated = sub;
-					break;
-				}
-			}
-			
-			AuthenticationResultMessage authResult = new AuthenticationResultMessage();
-			if(activated == null) {
-				authResult.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
-				return authResult;
+			AffectiveSubscriptions affectives = subscriptionService.getAffectiveSubscriptions(tryingAccount);
+			if(!affectives.hasActivated()) {
+				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, "활성화된 구독이 없습니다.");
 			}else {
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
 				
@@ -231,18 +112,11 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 				if(removed.isPresent()) {
 					unauthorizeClient(removed.get().getClientId());
 				}
-
-				authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
-				ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated);
-				authResult.setActivatedSubscription(activatedSubs);
-				return authResult;
+				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 			}
 			
 		} catch(Exception e) {
-			e.printStackTrace();
-			AuthenticationResultMessage ret = new AuthenticationResultMessage();
-			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
-			return ret;
+			return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, e.getMessage());
 		}
 	}
 
@@ -288,6 +162,7 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 		rabbitTemplate.setConnectionFactory(connectionFactory);
 		rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
 		
+		//TODO default exchnage로 보내는 방식으로 바꿔야한다.
 		String routingKey = String.format("cd.client.%s.unauth", clientId);
 		rabbitTemplate.convertAndSend(routingKey, new UnauthorizationMessage());
 	}

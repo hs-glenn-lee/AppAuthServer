@@ -31,14 +31,10 @@ public class Listener {
 			value = @Queue(value = "cd-server-auth-q", durable = "true", autoDelete = "false"),
 			exchange = @Exchange(value = "created-docs.direct", ignoreDeclarationExceptions = "true"),
 			arguments = @Argument(name = "BodyType", /*type="String",*/ value="Authentication.json"),
-			key = "cd.server.auth"))
+			key = "app.auth"))
 	public void processAppAuth(AuthenticationMessage authentication, Message message) {
 		// String msg 로 하면 message body가 출력된다.
-		System.out.println(authentication);
-		
 		authenticationService.authenticate(authentication, message);
-		
-		
 	}
 	
 

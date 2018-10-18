@@ -1,5 +1,7 @@
 package com.k2l1.CreatedDocsServer.messages;
 
+import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
+
 public class AuthenticationResultMessage {
 	
 	public static class ResultCode {
@@ -13,6 +15,19 @@ public class AuthenticationResultMessage {
 	private String resultCode;
 	private ActivatedSubscriptionMessage activatedSubscription;
 	private String message;
+	
+	public AuthenticationResultMessage () {}
+	public AuthenticationResultMessage (String retCode) {
+		this.resultCode = retCode;
+	}
+	public AuthenticationResultMessage (String retCode, String message) {
+		this.resultCode = retCode;
+		this.message = message;
+	}
+	public AuthenticationResultMessage (String retCode, Subscription activated) {
+		this.resultCode = retCode;
+		this.activatedSubscription = new ActivatedSubscriptionMessage(activated);
+	}
 	
 	public String getResultCode() {
 		return resultCode;

@@ -1,4 +1,5 @@
 spring:
+  profiles: development
   rabbitmq:
     host: 207.148.88.116
     virtual-host: created-docs-vhost
@@ -20,12 +21,40 @@ spring:
 logging:
   level:
     org: DEBUG
+server:
+  port: 9923
+local:
+  management:
+    port: 19234
     
-
-#destinations:
-#  queues:
-#    appAuth: #my prop
-#      exchange: created-docs.direct
-#      routingKey: app.auth
+---
+spring:
+  profiles: product
+  rabbitmq:
+    host: 207.148.88.116
+    virtual-host: created-docs-vhost
+    port: 5672
+    username: created-docs-dev
+    password: rlaehdgus
+  datasource:
+    url: jdbc:mariadb://207.148.88.116:3306/iron_shutter_db
+    username: iron_shutter_dba
+    password: rlaehdgus123
+    driver-class-name: org.mariadb.jdbc.Driver
+    driverClassName: org.mariadb.jdbc.Driver
+    tomcat:
+      min-idle: 5
+  redis:
+    host: 127.0.0.1
+    #password: gksdkfkd123
+    port: 6379
+logging:
+  level:
+    org: DEBUG
+server:
+  port: 9923
+local:
+  management:
+    port: 19234
 
     

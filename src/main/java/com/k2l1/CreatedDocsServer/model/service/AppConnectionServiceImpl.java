@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.k2l1.CreatedDocsServer.amqp.api.RabbitMqApi;
 import com.k2l1.CreatedDocsServer.model.redis.AppConnection;
 import com.k2l1.CreatedDocsServer.model.redis.AppConnectionRepo;
 
@@ -14,6 +15,9 @@ public class AppConnectionServiceImpl implements AppConnectionService{
 	@Autowired
 	AppConnectionRepo appConnectionRepo;
 	
+	@Autowired
+	RabbitMqApi rabbitMqApi;
+	
 	@Override
 	public Optional<AppConnection> get(Long accountId) {
 		return appConnectionRepo.findById(accountId);
@@ -21,6 +25,7 @@ public class AppConnectionServiceImpl implements AppConnectionService{
 
 	@Override
 	public void set(AppConnection appConnection) {
+		System.out.println(appConnection);
 		appConnectionRepo.save(appConnection);
 	}
 
@@ -39,7 +44,9 @@ public class AppConnectionServiceImpl implements AppConnectionService{
 	public boolean isExists(AppConnection appConnection) {
 		Optional<AppConnection> opt = this.get(appConnection.getAccountId());
 		if(opt.isPresent()) {
-			return true;
+			AppConnection  cur = opt.get();
+			boolean isClinetQueueExsists = rabbitMqApi.isQueueExsits("client."+cur.getClientId()+".auth");
+			return isClinetQueueExsists;
 		}else {
 			return false;
 		}

@@ -36,6 +36,16 @@ public class AffectiveSubscriptions {
 		}
 	}
 	
+	public AccountSubscriptionState getAccountSubscriptionState() {
+		if(hasActivated()) {
+			return AccountSubscriptionState.AVAILABLE;
+		}else if(hasPermitted()) {
+			return AccountSubscriptionState.AVAILABLE;
+		}else {
+			return AccountSubscriptionState.UNAVAILABLE;
+		}
+	}
+	
 	public boolean hasActivated() {
 		if(activated != null)
 			return true;

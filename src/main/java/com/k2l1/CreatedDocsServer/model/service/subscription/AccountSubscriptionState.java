@@ -2,10 +2,8 @@ package com.k2l1.CreatedDocsServer.model.service.subscription;
 
 public enum AccountSubscriptionState {
 	
-	ACTIVATED("ACTIVATED"),
-	CANCELED("CANCELED"),
-	EXPIRED("EXPIRED"),
-	PERMITTED("PERMITTED");
+	AVAILABLE("AVAILABLE"),
+	UNAVAILABLE("UNAVAILABLE");
 	
 	private String stateValue;
 	
