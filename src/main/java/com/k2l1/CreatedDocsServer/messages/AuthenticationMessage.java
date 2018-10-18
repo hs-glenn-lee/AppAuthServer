@@ -1,6 +1,6 @@
-package com.k2l1.CreatedDocsServer.messageTypes;
+package com.k2l1.CreatedDocsServer.messages;
 
-public class Authentication {
+public class AuthenticationMessage {
 	
 	public static class Type {
 		public static final String NORMAL = "NORMAL";

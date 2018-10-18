@@ -1,6 +1,6 @@
-package com.k2l1.CreatedDocsServer.messageTypes;
+package com.k2l1.CreatedDocsServer.messages;
 
-public class AuthenticationResult {
+public class AuthenticationResultMessage {
 	
 	public static class ResultCode {
 		public static final String AUTHORIZED = "AUTHORIZED";
@@ -11,7 +11,7 @@ public class AuthenticationResult {
 	}
 	
 	private String resultCode;
-	private ActivatedSubscription activatedSubscription;
+	private ActivatedSubscriptionMessage activatedSubscription;
 	private String message;
 	
 	public String getResultCode() {
@@ -20,10 +20,10 @@ public class AuthenticationResult {
 	public void setResultCode(String resultCode) {
 		this.resultCode = resultCode;
 	}
-	public ActivatedSubscription getActivatedSubscription() {
+	public ActivatedSubscriptionMessage getActivatedSubscription() {
 		return activatedSubscription;
 	}
-	public void setActivatedSubscription(ActivatedSubscription activatedSubscription) {
+	public void setActivatedSubscription(ActivatedSubscriptionMessage activatedSubscription) {
 		this.activatedSubscription = activatedSubscription;
 	}
 	public String getMessage() {

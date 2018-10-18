@@ -1,8 +1,8 @@
-package com.k2l1.CreatedDocsServer.messageTypes;
+package com.k2l1.CreatedDocsServer.messages;
 
 import java.io.Serializable;
 
-public class Unauthorization implements Serializable{
+public class UnauthorizationMessage implements Serializable{
 	
 	private static final long serialVersionUID = -1812911427008169986L;
 
@@ -11,7 +11,7 @@ public class Unauthorization implements Serializable{
 	private String code;
 	private String message;
 	
-	public Unauthorization () {
+	public UnauthorizationMessage () {
 		this.code = ENFORCED_UNAUTH_CODE;
 		this.message = "다른 곳에서 로그인  하여  로그아웃 되었습니다.";
 	}

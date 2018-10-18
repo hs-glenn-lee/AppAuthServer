@@ -37,7 +37,7 @@ public interface SubscriptionRepo extends JpaRepository<Subscription, String>{
 			+ "AND (subs.state = '" + Subscription.State.ACTIVATED +"' "
 			+ "OR subs.state = '" + Subscription.State.REQUESTED +"' "
 			+ "OR subs.state = '" + Subscription.State.PERMITTED +"') ")
-	List<Subscription> findImportantSubscriptionsOf(@Param("account") Account account);
+	List<Subscription> findAffectiveSubscriptionsOf(@Param("account") Account account);
 	
 	@Query("SELECT subs FROM Subscription subs "
 			+ "WHERE subs.state = '" + Subscription.State.REQUESTED +"' ")

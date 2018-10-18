@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
-import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
+import com.k2l1.CreatedDocsServer.messages.AuthenticationMessage;
 import com.k2l1.CreatedDocsServer.model.service.AuthenticationService;
 
 @Component
@@ -32,7 +32,7 @@ public class Listener {
 			exchange = @Exchange(value = "created-docs.direct", ignoreDeclarationExceptions = "true"),
 			arguments = @Argument(name = "BodyType", /*type="String",*/ value="Authentication.json"),
 			key = "cd.server.auth"))
-	public void processAppAuth(Authentication authentication, Message message) {
+	public void processAppAuth(AuthenticationMessage authentication, Message message) {
 		// String msg 로 하면 message body가 출력된다.
 		System.out.println(authentication);
 		

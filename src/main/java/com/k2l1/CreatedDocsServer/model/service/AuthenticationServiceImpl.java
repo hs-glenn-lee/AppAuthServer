@@ -17,10 +17,10 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.k2l1.CreatedDocsServer.messageTypes.ActivatedSubscription;
-import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
-import com.k2l1.CreatedDocsServer.messageTypes.AuthenticationResult;
-import com.k2l1.CreatedDocsServer.messageTypes.Unauthorization;
+import com.k2l1.CreatedDocsServer.messages.ActivatedSubscriptionMessage;
+import com.k2l1.CreatedDocsServer.messages.AuthenticationMessage;
+import com.k2l1.CreatedDocsServer.messages.AuthenticationResultMessage;
+import com.k2l1.CreatedDocsServer.messages.UnauthorizationMessage;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
 import com.k2l1.CreatedDocsServer.model.jpa.repos.AccountRepo;
@@ -28,9 +28,9 @@ import com.k2l1.CreatedDocsServer.model.jpa.repos.SubscriptionRepo;
 import com.k2l1.CreatedDocsServer.model.redis.AppConnection;
 
 @Service("authenticationService")
-public class SyncAuthenticationService implements AuthenticationService{
+public class AuthenticationServiceImpl implements AuthenticationService{
 	
-	Logger logger = LoggerFactory.getLogger(SyncAuthenticationService.class);
+	Logger logger = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
 	
 	@Autowired
 	SubscriptionRepo subscriptionRepo;
@@ -46,13 +46,13 @@ public class SyncAuthenticationService implements AuthenticationService{
 	
 	
 	@Override
-	public AuthenticationResult authenticateNormal(Authentication authentication) {
+	public AuthenticationResultMessage authenticateNormal(AuthenticationMessage authentication) {
 		
 		try {
 			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getImportantSubscriptions(tryingAccount);
+			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
 			List<Subscription> activated = new ArrayList<Subscription>();
 			List<Subscription> permitted = new ArrayList<Subscription>();
 
@@ -70,31 +70,31 @@ public class SyncAuthenticationService implements AuthenticationService{
 			
 			if(activated.isEmpty()) {
 				if(permitted.isEmpty()) {
-					AuthenticationResult ret = new AuthenticationResult();
-					ret.setResultCode(AuthenticationResult.ResultCode.UNAUHORIZED);
+					AuthenticationResultMessage ret = new AuthenticationResultMessage();
+					ret.setResultCode(AuthenticationResultMessage.ResultCode.UNAUHORIZED);
 					return ret;
 				}else {
-					AuthenticationResult ret = new AuthenticationResult();
-					ret.setResultCode(AuthenticationResult.ResultCode.NEED_TO_ACTIVATE_NEW);
+					AuthenticationResultMessage ret = new AuthenticationResultMessage();
+					ret.setResultCode(AuthenticationResultMessage.ResultCode.NEED_TO_ACTIVATE_NEW);
 					return ret;
 				}
 			}else {
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
-				AuthenticationResult authResult = new AuthenticationResult();
+				AuthenticationResultMessage authResult = new AuthenticationResultMessage();
 				Optional<AppConnection> existed = appConnectionService.get(appConnection.getAccountId());
 				if(existed.isPresent()) {
 					if(authentication.getClientId().equals(existed.get().getClientId())) {
 						appConnectionService.set(appConnection);
-						authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
-						ActivatedSubscription activatedSubs = new ActivatedSubscription(activated.get(0));
+						authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
+						ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated.get(0));
 						authResult.setActivatedSubscription(activatedSubs);
 					}else {
-						authResult.setResultCode(AuthenticationResult.ResultCode.DUPLICATED);
+						authResult.setResultCode(AuthenticationResultMessage.ResultCode.DUPLICATED);
 					}
 				}else {
 					appConnectionService.set(appConnection);
-					authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
-					ActivatedSubscription activatedSubs = new ActivatedSubscription(activated.get(0));
+					authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
+					ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated.get(0));
 					authResult.setActivatedSubscription(activatedSubs);
 				}
 
@@ -103,8 +103,8 @@ public class SyncAuthenticationService implements AuthenticationService{
 			
 		} catch(Exception e) {
 			e.printStackTrace();
-			AuthenticationResult ret = new AuthenticationResult();
-			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			AuthenticationResultMessage ret = new AuthenticationResultMessage();
+			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 			return ret;
 			
 		}
@@ -119,8 +119,8 @@ public class SyncAuthenticationService implements AuthenticationService{
 		}
 	}
 	
-	private List<Subscription> getImportantSubscriptions(Account account) {
-		return subscriptionRepo.findImportantSubscriptionsOf(account);
+	private List<Subscription> getAffectiveSubscriptions(Account account) {
+		return subscriptionRepo.findAffectiveSubscriptionsOf(account);
 	}
 	
 	
@@ -155,12 +155,12 @@ public class SyncAuthenticationService implements AuthenticationService{
 	}
 
 	@Override
-	public AuthenticationResult authenticateAndActivateNew(Authentication authentication) {
+	public AuthenticationResultMessage authenticateAndActivateNew(AuthenticationMessage authentication) {
 		try {
 			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getImportantSubscriptions(tryingAccount);
+			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
 			List<Subscription> activated = new ArrayList<Subscription>();
 			List<Subscription> permitted = new ArrayList<Subscription>();
 
@@ -176,9 +176,9 @@ public class SyncAuthenticationService implements AuthenticationService{
 				}
 			}
 			
-			AuthenticationResult authResult = new AuthenticationResult();
+			AuthenticationResultMessage authResult = new AuthenticationResultMessage();
 			if(permitted.isEmpty()) {
-				authResult.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				authResult.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 				return authResult;
 			}else {
 				Subscription newActivated = this.activate(permitted.get(0));
@@ -186,28 +186,28 @@ public class SyncAuthenticationService implements AuthenticationService{
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
 				appConnectionService.set(appConnection);
 				
-				authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
-				ActivatedSubscription activatedSubs = new ActivatedSubscription(newActivated);
+				authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
+				ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(newActivated);
 				authResult.setActivatedSubscription(activatedSubs);
 				return authResult;
 			}
 			
 		} catch(Exception e) {
 			e.printStackTrace();
-			AuthenticationResult ret = new AuthenticationResult();
-			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			AuthenticationResultMessage ret = new AuthenticationResultMessage();
+			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 			return ret;
 			
 		}
 	}
 
 	@Override
-	public AuthenticationResult authenticateEnforced(Authentication authentication) {
+	public AuthenticationResultMessage authenticateEnforcedly(AuthenticationMessage authentication) {
 		try {
 			Account tryingAccount = findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
 			
-			List<Subscription> importants = getImportantSubscriptions(tryingAccount);
+			List<Subscription> importants = getAffectiveSubscriptions(tryingAccount);
 
 			Subscription activated = null;
 			
@@ -219,9 +219,9 @@ public class SyncAuthenticationService implements AuthenticationService{
 				}
 			}
 			
-			AuthenticationResult authResult = new AuthenticationResult();
+			AuthenticationResultMessage authResult = new AuthenticationResultMessage();
 			if(activated == null) {
-				authResult.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				authResult.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 				return authResult;
 			}else {
 				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
@@ -232,36 +232,36 @@ public class SyncAuthenticationService implements AuthenticationService{
 					unauthorizeClient(removed.get().getClientId());
 				}
 
-				authResult.setResultCode(AuthenticationResult.ResultCode.AUTHORIZED);
-				ActivatedSubscription activatedSubs = new ActivatedSubscription(activated);
+				authResult.setResultCode(AuthenticationResultMessage.ResultCode.AUTHORIZED);
+				ActivatedSubscriptionMessage activatedSubs = new ActivatedSubscriptionMessage(activated);
 				authResult.setActivatedSubscription(activatedSubs);
 				return authResult;
 			}
 			
 		} catch(Exception e) {
 			e.printStackTrace();
-			AuthenticationResult ret = new AuthenticationResult();
-			ret.setResultCode(AuthenticationResult.ResultCode.ERROR);
+			AuthenticationResultMessage ret = new AuthenticationResultMessage();
+			ret.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 			return ret;
 		}
 	}
 
 	@Override
-	public void authenticate(Authentication authentication, Message message) {
-		AuthenticationResult result = null;
+	public void authenticate(AuthenticationMessage authentication, Message message) {
+		AuthenticationResultMessage result = null;
 		switch (authentication.getType()) {
-			case Authentication.Type.NORMAL :
+			case AuthenticationMessage.Type.NORMAL :
 				result = authenticateNormal(authentication);
 				break;
-			case Authentication.Type.ENFORCED :
-				result = authenticateEnforced(authentication);
+			case AuthenticationMessage.Type.ENFORCED :
+				result = authenticateEnforcedly(authentication);
 				break;
-			case Authentication.Type.ACTIVATE_NEW :
+			case AuthenticationMessage.Type.ACTIVATE_NEW :
 				result = authenticateAndActivateNew(authentication);
 				break;
 			default:
-				result = new AuthenticationResult();
-				result.setResultCode(AuthenticationResult.ResultCode.ERROR);
+				result = new AuthenticationResultMessage();
+				result.setResultCode(AuthenticationResultMessage.ResultCode.ERROR);
 				result.setMessage("Authencation.type is not proper.");
 				break;
 		}
@@ -278,7 +278,7 @@ public class SyncAuthenticationService implements AuthenticationService{
 		rabbitTemplate.convertAndSend(message.getMessageProperties().getReplyTo(), result);
 	}
 	
-	
+	@Override
 	public void unauthorizeClient (String clientId) {
 		MessageProperties reponseProperties = new MessageProperties();
 		reponseProperties.setContentType("application/json");
@@ -289,7 +289,7 @@ public class SyncAuthenticationService implements AuthenticationService{
 		rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
 		
 		String routingKey = String.format("cd.client.%s.unauth", clientId);
-		rabbitTemplate.convertAndSend(routingKey, new Unauthorization());
+		rabbitTemplate.convertAndSend(routingKey, new UnauthorizationMessage());
 	}
 
 }

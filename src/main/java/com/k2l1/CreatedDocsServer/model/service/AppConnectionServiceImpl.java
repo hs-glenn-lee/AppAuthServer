@@ -9,7 +9,7 @@ import com.k2l1.CreatedDocsServer.model.redis.AppConnection;
 import com.k2l1.CreatedDocsServer.model.redis.AppConnectionRepo;
 
 @Service("connectionService")
-public class SyncAppConnectionService implements AppConnectionService{
+public class AppConnectionServiceImpl implements AppConnectionService{
 	
 	@Autowired
 	AppConnectionRepo appConnectionRepo;

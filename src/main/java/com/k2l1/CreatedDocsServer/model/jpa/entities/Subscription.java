@@ -12,6 +12,8 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.apache.commons.lang3.time.DateUtils;
+
 
 @Entity
 @Table(name="subscription")
@@ -172,6 +174,17 @@ public class Subscription implements Serializable{
 				"expireAt: " + expireAt + 
 				"}";
 		return ret;
+	}
+	
+	
+	
+	private Date calculateExpireDate(Subscription subscription, Date start) {
+		Long amount = subscription.getPeriodAmount();
+		/*String unit = subscription.getPeriodUnit();*/
+		Date expireAt = DateUtils.addMonths(start, amount.intValue());
+		DateUtils.addDays(expireAt, 1);
+		DateUtils.addSeconds(expireAt, -1);
+		return expireAt;
 	}
 
 }

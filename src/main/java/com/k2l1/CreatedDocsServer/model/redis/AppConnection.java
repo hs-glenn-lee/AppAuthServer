@@ -6,7 +6,7 @@ import java.util.Date;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
 
-import com.k2l1.CreatedDocsServer.messageTypes.Authentication;
+import com.k2l1.CreatedDocsServer.messages.AuthenticationMessage;
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Account;
 
 @RedisHash("appConnection")
@@ -18,7 +18,7 @@ public class AppConnection implements Serializable{
 	private Date createdAt;
 	
 	public AppConnection() {}
-	public AppConnection(Account account, Authentication authentication) {
+	public AppConnection(Account account, AuthenticationMessage authentication) {
 		this.accountId = account.getId();
 		this.clientId = authentication.getClientId();
 	}

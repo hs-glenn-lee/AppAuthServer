@@ -1,13 +1,13 @@
-package com.k2l1.CreatedDocsServer.messageTypes;
+package com.k2l1.CreatedDocsServer.messages;
 
 import com.k2l1.CreatedDocsServer.model.jpa.entities.Subscription;
 
-public class ActivatedSubscription {
+public class ActivatedSubscriptionMessage {
 	private String id;
 	private String activatedAt;
 	
-	public ActivatedSubscription () {}
-	public ActivatedSubscription (Subscription subscription) {
+	public ActivatedSubscriptionMessage () {}
+	public ActivatedSubscriptionMessage (Subscription subscription) {
 		this.id = subscription.getId();
 		this.activatedAt = subscription.getActivatedAt().toString();
 	}
