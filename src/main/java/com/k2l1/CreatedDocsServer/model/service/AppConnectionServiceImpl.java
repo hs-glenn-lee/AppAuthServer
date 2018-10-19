@@ -44,9 +44,7 @@ public class AppConnectionServiceImpl implements AppConnectionService{
 	public boolean isExists(AppConnection appConnection) {
 		Optional<AppConnection> opt = this.get(appConnection.getAccountId());
 		if(opt.isPresent()) {
-			AppConnection  cur = opt.get();
-			boolean isClinetQueueExsists = rabbitMqApi.isQueueExsits("client."+cur.getClientId()+".auth");
-			return isClinetQueueExsists;
+			return true;
 		}else {
 			return false;
 		}
