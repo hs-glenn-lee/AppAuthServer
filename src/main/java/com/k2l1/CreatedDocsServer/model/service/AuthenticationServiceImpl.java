@@ -54,19 +54,20 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 			if(affectives.getAccountSubscriptionState() == AccountSubscriptionState.UNAVAILABLE) {
 				return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.UNAUHORIZED);
 			}else {
-				AppConnection appConnection = new AppConnection(tryingAccount, authentication);
-				
-				Optional<AppConnection> existed = appConnectionService.get(appConnection.getAccountId());
-				if(existed.isPresent()) {
-					System.out.println(authentication.getClientId()+ ", " + existed.get().getClientId());
-					if(authentication.getClientId().equals(existed.get().getClientId())) {
+				if(!affectives.hasActivated()) {
+					return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.NEED_TO_ACTIVATE_NEW);
+				}else {
+					AppConnection appConnection = new AppConnection(tryingAccount, authentication);
+					Optional<AppConnection> existed = appConnectionService.get(appConnection.getAccountId());
+					if(existed.isPresent()) {
+						if(!authentication.getClientId().equals(existed.get().getClientId())) {
+							unauthorizeClient(existed.get().getClientId());
+						}
 						appConnectionService.set(appConnection);
 						return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 					}else {
-						return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.DUPLICATED);
+						return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 					}
-				}else {
-					return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.AUTHORIZED, affectives.getActivated());
 				}
 			}
 		} catch(Exception e) {
@@ -96,7 +97,7 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 	}
 
 	
-	private AuthenticationResultMessage authenticateEnforcedly(AuthenticationMessage authentication) {
+/*	private AuthenticationResultMessage authenticateEnforcedly(AuthenticationMessage authentication) {
 		try {
 			Account tryingAccount = accountService.findAccount(authentication.getUsername(), authentication.getPassword());
 			if(tryingAccount == null) { throw new IllegalStateException("해당 사용자를 찾을 수 없습니다."); }
@@ -118,7 +119,7 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 		} catch(Exception e) {
 			return new AuthenticationResultMessage(AuthenticationResultMessage.ResultCode.ERROR, e.getMessage());
 		}
-	}
+	}*/
 
 	@Override
 	public void authenticate(AuthenticationMessage authentication, Message message) {
@@ -126,9 +127,6 @@ public class AuthenticationServiceImpl implements AuthenticationService{
 		switch (authentication.getType()) {
 			case AuthenticationMessage.Type.NORMAL :
 				result = authenticateNormal(authentication);
-				break;
-			case AuthenticationMessage.Type.ENFORCED :
-				result = authenticateEnforcedly(authentication);
 				break;
 			case AuthenticationMessage.Type.ACTIVATE_NEW :
 				result = authenticateAndActivateNew(authentication);

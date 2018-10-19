@@ -9,7 +9,6 @@ public class AuthenticationResultMessage {
 		public static final String UNAUHORIZED = "UNAUHORIZED";
 		public static final String ERROR = "ERROR";
 		public static final String NEED_TO_ACTIVATE_NEW = "NEED_TO_ACTIVATE_NEW";
-		public static final String DUPLICATED = "DUPLICATED";
 	}
 	
 	private String resultCode;
